@@ -1,0 +1,13 @@
+<!-- profile.erb -->
+
+<h1>Perfil do Usuário</h1>
+<p><strong>Nome:</strong> <%= user_info['display_name'] %></p>
+<p><strong>Email:</strong> <%= user_info['email'] %></p>
+<p><strong>País:</strong> <%= user_info['country'] %></p>
+
+<h2>Playlists Públicas</h2>
+<ul>
+  <% playlists['items'].each do |playlist| %>
+    <li><%= playlist['name'] %></li>
+  <% end %>
+</ul>
