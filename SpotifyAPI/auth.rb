@@ -4,13 +4,14 @@ require 'rest-client'
 require 'securerandom'
 require 'uri'
 require 'json'
+require 'dotenv/load'
 
 #Criação da classe
 class SpotifyAuth
   #Declaração dos ID, aqui deve ser feito via arquivo .env
-  CLIENT_ID = 'a721dd02721d4accb5de00f929dbae48'
-  CLIENT_SECRET = '66cc77895a5747d387afec9129ac5cbe'
-  REDIRECT_URI = 'https://getaccess/callback'
+  CLIENT_ID = ENV['CLIENT_ID']
+  CLIENT_SECRET = ENV['CLIENT_SECRET']
+  REDIRECT_URI = ENV['REDIRECT_URI']
   SCOPE = 'user-read-private user-read-email'
 
   #Necessário a criação do state para previnir ataques CSRF.
