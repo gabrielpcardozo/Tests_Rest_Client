@@ -1,7 +1,13 @@
 require 'rest-client'
 require 'json'
-require 'base64'
-require_relative 'auth'
+#Metodo de autenticação temporário, enquanto não arrumo o arquivo de autenticação.
+
+HEADERS = {Authorization: "Bearer BQBbd4mwboO5Z36eYkzbr44VSHAeRYVY2ayeTKjwURbMVD09qcGedzIz4CvkKdmiYHdOrbLWc7zDNsMxrOfzZYXNft6hG8Mz3vNilxRI7BfQ64ruI2H_c94SZ8_lD2stiW-45LgxQiBFkb4Z5-lIA01AQMTJCHZwqWANHXJnwRlMsaxpBDrxSAY59Fan5tYjaTA"}
+
+#profile_data = RestClient.get("https://api.spotify.com/v1/me", headers)
+
+#data = JSON.parse(profile_data.body)
+#puts data
 
 def get_profile(access_token)
   url = "https://api.spotify.com/v1/me"
@@ -11,15 +17,14 @@ def get_profile(access_token)
   return JSON.parse(response.body)
 end
 
+puts profile.get_profile(HEADERS)
+
 def get_albums(access_token)
-  url = "https://api.spotify.com/v1/me/albums/contains?ids=382ObEPsp2rxGrnsizN5TX%2C1A2GTWGtFfWp7KSQTwWOyo%2C2noRn2Aes5aoNVsU6iWThc'"
+  url = "https://api.spotify.com/v1/me/albums"
 
   response = RestClient.get(url, Authorization: "Bearer #{access_token}")
 
   return JSON.parse(response.body)
 end
 
-
-authorization = Authentication.new
-teste = get_albums(authorization.get_token_client_authorization)
-puts teste
+puts albums.get_albums(HEADERS)
