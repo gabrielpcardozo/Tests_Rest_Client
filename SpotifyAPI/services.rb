@@ -24,12 +24,6 @@ end
 def get_albums(access_token)
   url = "https://api.spotify.com/v1/me/albums"
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
-  JSON.parse(response.body)
-end
-
-def format_albums(access_token)
-  url = "https://api.spotify.com/v1/me/albums"
-  response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
   albums = JSON.parse(response.body)
   
   albums['items'].each do |item|
@@ -38,22 +32,32 @@ def format_albums(access_token)
   end
 end
 
+def musics_album(access_token)
+  url = "https://api.spotify.com/v1/me/albums"
+  response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
+  albums = JSON.parse(response.body)
+
+  albums['items'].each do |item|
+    album = item['album']
+    album_name = album['name']
+    artist_names = album['artists'].map { |artist| artist['name'] }.join(', ')
+    puts "Álbum: #{album_name}, Artista(s): #{artist_names}"
+  end
+end
+
+  
+  #['items'][1]['album']['artists'][0]['name']
+
+
 access_token = ENV['ACCESS_TOKEN']
 
 #puts get_profile(access_token)
 #puts format_profile(access_token)
-#albums = get_albums(access_token)
-#teste_album = JSON.pretty_generate(get_albums(access_token))
-format_albums(access_token)
+#get_albums(access_token)
+musics_album(access_token)
 
-testes =get_albums(access_token)
-puts testes.keys[0,5]
-data = testes['items'].first['album']
-puts JSON.pretty_generate(data)
-#teste = teste['items']
-#puts teste.keys[0,2]
 
-#testes['items'].each do |item|
-  #album = item['album']
-  #puts album['name']  # Imprime o nome do álbum
-#end
+url = "https://api.spotify.com/v1/me/albums"
+response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
+url = JSON.parse(response.body)
+#puts JSON.pretty_generate(url["items"])
