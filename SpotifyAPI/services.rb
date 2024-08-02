@@ -61,16 +61,33 @@ def album_info(access_token)
   end
 end
 
+def top_artists(access_token)
+  url = "https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=5"
+  response = RestClient.get(url, {Authorization: "Bearer #{access_token}"})
+  most_listen = JSON.parse(response.body)
+  
+  result = []
+
+  most_listen['items'].each do |item|
+    album = item['album']
+    artists = album['artists'][0]['name']
+    track = album['name']
+
+   result << "Artista: #{artists}, Music: #{track}"
+  end
+  return result
+end
+
 access_token = ENV['ACCESS_TOKEN']
 
 #puts get_profile(access_token)
 #puts format_profile(access_token)
 #get_albums(access_token)
-album_info(access_token)
+#album_info(access_token)
 #get_album_tracks(access_token,)
+puts top_artists(access_token)
 
-
-url = "https://api.spotify.com/v1/me/top/artists"
+url = "https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=5"
 response = RestClient.get(url, { Authorization: "Bearer #{access_token}"})
 url = JSON.parse(response.body)
-puts JSON.pretty_generate(url)
+#puts JSON.pretty_generate(url)
