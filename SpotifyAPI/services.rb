@@ -16,8 +16,9 @@ def format_profile(access_token)
   profile = get_profile(access_token)
 
   profile_name = profile["display_name"]
-  uri = profile["uri"].split(':').last
-  return "Full Name: #{profile_name}, User: #{uri}" 
+  id = profile["id"]
+  #uri = profile["uri"].split(':').last
+  return "Full Name: #{profile_name}, User: #{id}" 
 end
 
 #Coleta somente o nome de todos os albums.
@@ -46,6 +47,8 @@ def album_info(access_token)
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
   albums = JSON.parse(response.body)
 
+  result = []
+
   albums['items'].each do |item|
     album = item['album']
     album_name = album['name']
@@ -57,11 +60,47 @@ def album_info(access_token)
     tracks = get_album_tracks(access_token, album_id)
     track_names = tracks.map { |track| track['name'] }.join(', ')
     
-    return "Álbum: #{album_name}, Artista(s): #{artist_names}, Total tracks: #{quantity_tracks}, Tracks: #{track_names}"
+    result << "Álbum: #{album_name}, Artista(s): #{artist_names}, Total tracks: #{quantity_tracks}, Tracks: #{track_names}"     
   end
+
+  return result
 end
 
-def top_artists(access_token)
+#
+def get_playlist_tracks(access_token, playlist_id)
+  url = "https://api.spotify.com/v1/playlists/#{playlist_id}/tracks"
+  response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
+  tracks = JSON.parse(response.body)
+  track_names = tracks['items'].map { |item| item['track']['name'] }
+  track_names.join(', ')
+end
+
+#Coleta todas as playlists e suas musicas uma ao lado da outra.
+def get_playlists(access_token)
+  profile = get_profile(access_token)
+  id = profile["id"]
+  
+  url = "https://api.spotify.com/v1/users/#{id}/playlists"
+  response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
+  playlists = JSON.parse(response.body)
+
+  result = []
+  playlists['items'].each do |item|
+    playlist = item['name']
+    count_tracks = item['tracks']["total"]
+    
+    playlist_id = item['id']
+    track_names = get_playlist_tracks(access_token, playlist_id)
+    
+    result << "Playlist: #{playlist}, Quantidade de Músicas: #{count_tracks}, Músicas: #{track_names}"
+  end
+  result << "No total temos: #{playlists['items'].size} playlists"
+  
+  return result.join("\n")
+end
+
+#Musicas mais escutadas da conta autenticada
+def most_listen(access_token)
   url = "https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=5"
   response = RestClient.get(url, {Authorization: "Bearer #{access_token}"})
   most_listen = JSON.parse(response.body)
@@ -83,9 +122,11 @@ access_token = ENV['ACCESS_TOKEN']
 #puts get_profile(access_token)
 #puts format_profile(access_token)
 #get_albums(access_token)
-#album_info(access_token)
-#get_album_tracks(access_token,)
-puts top_artists(access_token)
+#puts album_info(access_token)
+#get_album_tracks(access_token)
+puts get_playlists(access_token)
+#puts most_listen(access_token)
+
 
 url = "https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=5"
 response = RestClient.get(url, { Authorization: "Bearer #{access_token}"})
