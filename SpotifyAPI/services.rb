@@ -27,7 +27,19 @@ def get_profile_id(access_token)
   return id
 end
 
-#Coleta somente o nome de todos os albums.
+#Coleta todas as músicas.
+def all_tracks(access_token)
+  url = "https://api.spotify.com/v1/me/tracks"
+  response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
+  tracks = JSON.parse(response.body)
+  
+  tracks['items'].each do |item|
+    track = item['album']
+    return track['name']
+  end
+end
+
+#Coleta somente o nome de todos os albums salvos na conta.
 def get_albums(access_token)
   url = "https://api.spotify.com/v1/me/albums"
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
@@ -152,20 +164,37 @@ def get_all_playlists(access_token)
 end
 
 #Musicas mais escutadas da conta autenticada
-def most_listen(access_token)
-  url = "https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=5"
+def most_musics_listen(access_token)
+  url = "https://api.spotify.com/v1/me/top/tracks?time_range=short_term&limit=5"
   response = RestClient.get(url, {Authorization: "Bearer #{access_token}"})
   most_listen = JSON.parse(response.body)
   
   result = []
 
   most_listen['items'].each do |item|
-    album = item['album']
-    artists = album['artists'][0]['name']
-    track = album['name']
+    artists = item['artists'].map { |artist| artist['name'] }.join(", ")
+    track = item['name']
 
-   result << "Artista: #{artists}, Music: #{track}"
+    result << "Artista: #{artists}, Música: #{track}"
   end
+
+  return result
+end
+
+
+#Cria um resumo da conta autenticada, como albums, musicas mais escutadas, principais playlists e principais podcasts
+def resume_profile(access_token)
+  result = []
+  #Profile
+  my_profile = get_profile(access_token)
+  result << my_profile
+  #Best Musics
+  best_musics = most_musics_listen(access_token)
+  result << best_musics
+  #My playlists
+  my_playlists = get_playlists(access_token)
+  result << my_playlists
+
   return result
 end
 
@@ -181,11 +210,11 @@ access_token = ENV['ACCESS_TOKEN']
 #puts get_playlists(access_token)
 #puts list_playlist(access_token)
 #puts get_name_for_id(access_token)
-test =  get_name_for_id(access_token)
-puts test
-puts get_playlist_tracks(access_token,test)
-#puts most_listen(access_token)
-
+#test =  get_name_for_id(access_token)
+#puts test
+#puts get_playlist_tracks(access_token,test)
+#puts most_musics_listen(access_token)
+puts resume_profile(access_token)
 
 url = "https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=5"
 response = RestClient.get(url, { Authorization: "Bearer #{access_token}"})
