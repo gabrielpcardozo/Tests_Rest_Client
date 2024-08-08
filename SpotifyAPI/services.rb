@@ -21,6 +21,12 @@ def format_profile(access_token)
   return "Full Name: #{profile_name}, User: #{id}" 
 end
 
+def get_profile_id(access_token)
+  profile = get_profile(access_token)
+  id = profile["id"]
+  return id
+end
+
 #Coleta somente o nome de todos os albums.
 def get_albums(access_token)
   url = "https://api.spotify.com/v1/me/albums"
@@ -48,6 +54,7 @@ def album_info(access_token)
   albums = JSON.parse(response.body)
 
   result = []
+  
 
   albums['items'].each do |item|
     album = item['album']
@@ -66,7 +73,47 @@ def album_info(access_token)
   return result
 end
 
-#
+#Lista todas as playlists na conta para o usuario saber oq ele esta procurando. 
+def list_playlist(access_token)
+  #id = get_profile_id(access_token)
+  url = "https://api.spotify.com/v1/users/#{get_profile_id(access_token)}/playlists"
+  response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
+  playlists_name = JSON.parse(response.body)
+
+  result = []
+
+  playlists_name["items"].each do |item|
+    playlist_name = item['name']
+
+    result << playlist_name
+  end
+
+  return result
+
+end
+
+#Verifica se o nome passado pelo usuario e valido, e coleta o id da playlist
+def get_name_for_id(access_token)
+  puts "Qual Playlist você deseja?"
+  input_playlist = gets.chomp.downcase
+
+  url = "https://api.spotify.com/v1/users/#{get_profile_id(access_token)}/playlists"
+  response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
+  playlists = JSON.parse(response.body)
+  
+  playlists["items"].each do |item|
+    playlist_name = item['name']
+    if input_playlist == playlist_name.downcase
+      playlist_id = item["id"]
+      return playlist_id
+    end
+  end
+  puts "Playlist não encontrada, confira as suas playlists:"
+  list = list_playlist(access_token)
+  return list
+end
+
+#Coleta somente as musicas das playlists pelo ID.
 def get_playlist_tracks(access_token, playlist_id)
   url = "https://api.spotify.com/v1/playlists/#{playlist_id}/tracks"
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
@@ -76,7 +123,7 @@ def get_playlist_tracks(access_token, playlist_id)
 end
 
 #Coleta todas as playlists e suas musicas uma ao lado da outra.
-def get_playlists(access_token)
+def get_all_playlists(access_token)
   profile = get_profile(access_token)
   id = profile["id"]
   
@@ -84,18 +131,23 @@ def get_playlists(access_token)
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
   playlists = JSON.parse(response.body)
 
+  #Armazena o resultado do bloco e consulta na API
   result = []
+  #Contador para o total de musicas vai ser usado so depois do end.
+  all_tracks = 0
+
   playlists['items'].each do |item|
     playlist = item['name']
     count_tracks = item['tracks']["total"]
+    all_tracks = count_tracks + all_tracks
     
     playlist_id = item['id']
     track_names = get_playlist_tracks(access_token, playlist_id)
     
+    #Retorno de todas as playlists e musicas.
     result << "Playlist: #{playlist}, Quantidade de Músicas: #{count_tracks}, Músicas: #{track_names}"
   end
-  result << "No total temos: #{playlists['items'].size} playlists"
-  
+  result << "No total temos: #{playlists['items'].size} playlists e temos temos #{all_tracks} músicas"
   return result.join("\n")
 end
 
@@ -121,10 +173,17 @@ access_token = ENV['ACCESS_TOKEN']
 
 #puts get_profile(access_token)
 #puts format_profile(access_token)
+#puts get_profile_id(access_token)
 #get_albums(access_token)
 #puts album_info(access_token)
+
 #get_album_tracks(access_token)
-puts get_playlists(access_token)
+#puts get_playlists(access_token)
+#puts list_playlist(access_token)
+#puts get_name_for_id(access_token)
+test =  get_name_for_id(access_token)
+puts test
+puts get_playlist_tracks(access_token,test)
 #puts most_listen(access_token)
 
 
