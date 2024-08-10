@@ -187,15 +187,50 @@ def resume_profile(access_token)
   result = []
   #Profile
   my_profile = get_profile(access_token)
-  result << my_profile
+  name = my_profile["display_name"]
+  user = my_profile["id"]
+  result << name
+  result << user
+  result << "------"
   #Best Musics
   best_musics = most_musics_listen(access_token)
   result << best_musics
+  result << "------"
   #My playlists
-  my_playlists = get_playlists(access_token)
+  my_playlists = list_playlist(access_token)
   result << my_playlists
 
   return result
+end
+
+def search_track(access_token, input_search, type="default", limit=10)
+  url = 'https://api.spotify.com/v1/search'
+  params = {
+    q: input_search,
+    limit: limit,
+    type: "track"
+  }
+  # Syntax_URL -> https://api.spotify.com/v1/search?q=query_search%name&type=typek&limit=<number>
+  #URL -> https://api.spotify.com/v1/search?q=track%oneofus&type=track&limit=3
+
+  response = RestClient.get(url, {Authorization: "Bearer #{access_token}", params: params})
+  search = JSON.parse(response.body)
+
+  result = []
+
+  search["tracks"]["items"].each do |item|
+    track_name = item["name"]
+    artist_name = item["artists"].map { |artist| artist["name"] }.join(", ")
+    artist_profile = item["artists"].first["external_urls"]["spotify"]
+    track_album = item["album"]["external_urls"]["spotify"]
+
+    infos = "Music Name: #{track_name}, Artist Name: #{artist_name}, Artist Profile: #{artist_profile}, Album: #{track_album}"
+    result << "-" * infos.length
+    result << infos
+  end
+
+  return result
+  
 end
 
 access_token = ENV['ACCESS_TOKEN']
@@ -214,7 +249,10 @@ access_token = ENV['ACCESS_TOKEN']
 #puts test
 #puts get_playlist_tracks(access_token,test)
 #puts most_musics_listen(access_token)
-puts resume_profile(access_token)
+#puts resume_profile(access_token)
+#puts all_tracks(access_token)
+puts search_track(access_token, "One Of Us")
+
 
 url = "https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=5"
 response = RestClient.get(url, { Authorization: "Bearer #{access_token}"})
