@@ -233,6 +233,67 @@ def search_track(access_token, input_search, type="default", limit=10)
   
 end
 
+def time_to_listen(access_token)
+  url = "https://api.spotify.com/v1/me/player/recently-played"
+  params =  {
+    limit: 50
+  }
+  
+  response = RestClient.get(url, {Authorization: "Bearer #{access_token}", params: params})
+  recently_listened = JSON.parse(response.body)
+  
+  response = RestClient.get(url, { Authorization: "Bearer #{access_token}", params: params })
+  recently_listened = JSON.parse(response.body)
+  
+  track_info = Hash.new { |hash, key| hash[key] = { "artist" => "", "duration_ms" => 0, "repeat_time" => 0 } }
+
+  recently_listened["items"].each do |item|
+    track_name = item["track"]["name"]
+    artist_name = item["track"]["artists"].map { |artist| artist["name"] }.join(", ")
+    duration_ms = item["track"]["duration_ms"]
+
+    # Atualiza as informações da música
+    track_info[track_name]["artist"] = artist_name
+    track_info[track_name]["duration_ms"] = duration_ms
+    track_info[track_name]["repeat_time"] += 1
+  end
+
+  # Cria o resultado final
+  result = track_info.map do |name, info|
+    "Musica: #{name}, Artista: #{info['artist']}, Tempo escutado: #{info['duration_ms']} ms, Vezes escutado: #{info['repeat_time']}\n"
+  end
+
+  result.join("\n")
+end
+
+=begin
+  track_count = Hash.new(0)
+
+  track_info = {}
+
+  recently_listened["items"].each do |item|
+    track_name = item["track"]["name"]
+    artist_name = item["track"]["artists"].map { |artist| artist["name"] }.join(", ")
+    duration_ms = item["track"]["duration_ms"]
+
+    # Contar repetições
+    track_count[track_name] += 1
+
+    # Armazenar informações adicionais, se ainda não estiver armazenado
+    unless track_info.key?(track_name)
+      track_info[track_name] = { artist: artist_name, duration: duration_ms }
+    end
+  end
+
+  # Montar o resultado final
+  result = track_count.map do |track_name, count|
+    info = track_info[track_name]
+    "Music: #{track_name}, Artist: #{info[:artist]}, Duration_Time: #{info[:duration]}, Repetições: #{count}"
+  end
+
+  result
+end
+=end
 access_token = ENV['ACCESS_TOKEN']
 
 #puts get_profile(access_token)
@@ -251,8 +312,8 @@ access_token = ENV['ACCESS_TOKEN']
 #puts most_musics_listen(access_token)
 #puts resume_profile(access_token)
 #puts all_tracks(access_token)
-puts search_track(access_token, "One Of Us")
-
+#puts search_track(access_token, "One Of Us")
+puts time_to_listen(access_token)
 
 url = "https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=5"
 response = RestClient.get(url, { Authorization: "Bearer #{access_token}"})
