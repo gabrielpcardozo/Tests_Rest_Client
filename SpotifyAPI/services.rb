@@ -233,19 +233,20 @@ def search_track(access_token, input_search, type="default", limit=10)
   
 end
 
+def milliseconds_to_minutes(milliseconds)
+  seconds = milliseconds / 1000.0
+  minutes = seconds / 60.0
+  minutes.round(2)
+end
+
 def time_to_listen(access_token)
   url = "https://api.spotify.com/v1/me/player/recently-played"
-  params =  {
-    limit: 50
-  }
-  
-  response = RestClient.get(url, {Authorization: "Bearer #{access_token}", params: params})
-  recently_listened = JSON.parse(response.body)
-  
+  params = { limit: 50 }
+
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}", params: params })
   recently_listened = JSON.parse(response.body)
-  
-  track_info = Hash.new { |hash, key| hash[key] = { "artist" => "", "duration_ms" => 0, "repeat_time" => 0 } }
+
+  track_info = Hash.new { |hash, key| hash[key] = { "artist" => "", "total_time" => 0, "repeat_time" => 0 } }
 
   recently_listened["items"].each do |item|
     track_name = item["track"]["name"]
@@ -254,13 +255,16 @@ def time_to_listen(access_token)
 
     # Atualiza as informações da música
     track_info[track_name]["artist"] = artist_name
-    track_info[track_name]["duration_ms"] = duration_ms
     track_info[track_name]["repeat_time"] += 1
+
+    # Calcula o tempo total escutado
+    total_minutes = milliseconds_to_minutes(duration_ms) * track_info[track_name]["repeat_time"]
+    track_info[track_name]["total_time"] = total_minutes
   end
 
   # Cria o resultado final
   result = track_info.map do |name, info|
-    "Musica: #{name}, Artista: #{info['artist']}, Tempo escutado: #{info['duration_ms']} ms, Vezes escutado: #{info['repeat_time']}\n"
+    "Musica: #{name}, Artista: #{info['artist']}, Tempo escutado: #{info['total_time']} minutos, Vezes escutado: #{info['repeat_time']}\n"
   end
 
   result.join("\n")
