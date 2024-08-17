@@ -246,58 +246,56 @@ def time_to_listen(access_token)
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}", params: params })
   recently_listened = JSON.parse(response.body)
 
-  track_info = Hash.new { |hash, key| hash[key] = { "artist" => "", "total_time" => 0, "repeat_time" => 0 } }
+  track_info = Hash.new { |hash, key| hash[key] = { "artist" => "", "total_time" => 0, "repeat_time" => 0 , "music_id" => ""} }
 
   recently_listened["items"].each do |item|
     track_name = item["track"]["name"]
     artist_name = item["track"]["artists"].map { |artist| artist["name"] }.join(", ")
     duration_ms = item["track"]["duration_ms"]
+    music_id = item["track"]["id"]
 
     # Atualiza as informações da música
     track_info[track_name]["artist"] = artist_name
     track_info[track_name]["repeat_time"] += 1
+    track_info[track_name]["music_id"] = music_id
 
     # Calcula o tempo total escutado
     total_minutes = milliseconds_to_minutes(duration_ms) * track_info[track_name]["repeat_time"]
     track_info[track_name]["total_time"] = total_minutes
   end
-
-  # Cria o resultado final
-  result = track_info.map do |name, info|
-    "Musica: #{name}, Artista: #{info['artist']}, Tempo escutado: #{info['total_time']} minutos, Vezes escutado: #{info['repeat_time']}\n"
-  end
-
-  result.join("\n")
-end
-
 =begin
-  track_count = Hash.new(0)
-
-  track_info = {}
-
-  recently_listened["items"].each do |item|
-    track_name = item["track"]["name"]
-    artist_name = item["track"]["artists"].map { |artist| artist["name"] }.join(", ")
-    duration_ms = item["track"]["duration_ms"]
-
-    # Contar repetições
-    track_count[track_name] += 1
-
-    # Armazenar informações adicionais, se ainda não estiver armazenado
-    unless track_info.key?(track_name)
-      track_info[track_name] = { artist: artist_name, duration: duration_ms }
-    end
-  end
-
-  # Montar o resultado final
-  result = track_count.map do |track_name, count|
-    info = track_info[track_name]
-    "Music: #{track_name}, Artist: #{info[:artist]}, Duration_Time: #{info[:duration]}, Repetições: #{count}"
-  end
-
-  result
-end
+  Cria o resultado final
+  result = track_info.map do |name, info|
+    #"Musica: #{name}, Artista: #{info['artist']}, Tempo escutado: #{info['total_time']} minutos, Vezes escutado: #{info['repeat_time']}\n"
 =end
+  
+  track_info.map do |name, info|
+    {
+      name: name,
+      artist: info["artist"],
+      total_time: info["total_time"],
+      repeat_time: info["repeat_time"],
+      music_id: info["music_id"]
+    }
+  end
+end
+
+def hash_most_listened(access_token)
+  return time_to_listen(access_token)
+end
+
+def sort_musics_most_listened(access_token)
+  musics = time_to_listen(access_token)
+
+  # Ordena as músicas pelo número de vezes que foram escutadas (repeat_time) em ordem decrescente
+  sorted_musics = musics.sort_by { |music| -music[:repeat_time] }
+
+  # Formata o resultado final para exibição
+  sorted_musics.map do |music|
+    "Musica: #{music[:name]}, Artista: #{music[:artist]}, Tempo escutado: #{music[:total_time]} minutos, Vezes escutado: #{music[:repeat_time]}\n"
+  end.join("\n")
+end
+
 access_token = ENV['ACCESS_TOKEN']
 
 #puts get_profile(access_token)
@@ -317,9 +315,13 @@ access_token = ENV['ACCESS_TOKEN']
 #puts resume_profile(access_token)
 #puts all_tracks(access_token)
 #puts search_track(access_token, "One Of Us")
-puts time_to_listen(access_token)
+#puts time_to_listen(access_token)
+puts hash_most_listened(access_token)
+puts sort_musics_most_listened(access_token)
 
+=begin
 url = "https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=5"
 response = RestClient.get(url, { Authorization: "Bearer #{access_token}"})
 url = JSON.parse(response.body)
-#puts JSON.pretty_generate(url)
+puts JSON.pretty_generate(url)
+=end
