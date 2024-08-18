@@ -240,36 +240,45 @@ def milliseconds_to_minutes(milliseconds)
 end
 
 def time_to_listen(access_token)
+  #URL com as informacoes necessarias
   url = "https://api.spotify.com/v1/me/player/recently-played"
+  #Adiciona um parametro de 50 items(musicas)
   params = { limit: 50 }
-
+  #Usa o restclient para coletar as informacoes
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}", params: params })
+  # Devolve em formato Json.
   recently_listened = JSON.parse(response.body)
-
+  #Crio uma hash(dicionario) para ter um padrao do que eu quero de informacoes coletadas.
   track_info = Hash.new { |hash, key| hash[key] = { "artist" => "", "total_time" => 0, "repeat_time" => 0 , "music_id" => ""} }
-
+    # { |hash, key|...} -> Aqui e passado para a hash dois parametros a propria HASH e sua KEY, sempre que for acessar essa Hash e assim que ele deve ser chamada.
+    # hash[key] = { ... } -> Define que toda KEY criada vai conter os seguintes VALUES -> "artist" => "", "total_time" => 0, "repeat_time" => 0 , "music_id" => ""
+  
+  #Nesse bloco comecamos a coletar as informacoes dentro da URL da API e armazenamos em variaveis 
   recently_listened["items"].each do |item|
     track_name = item["track"]["name"]
+    #Como uma musica pode ter  mais de um artista precisamos utilizar o .map para coletar todos os nomes disponiveis.
     artist_name = item["track"]["artists"].map { |artist| artist["name"] }.join(", ")
+      #item["track"]["artists"].map -> Coleta todo interavel que esta presente nessa possicao de - ["track"]["artists"] e os mapeia com o .map
+      #{ |artist| artist["name"] } -> Cria um novo interavel somente com os nomes de artistas encontrados nessa possicao - artist["name"]
+      #.join(", ") -> Para cada artista encontrado separa com uma ", " para ficarem separados corretamente como: artista_1, artista_2, ...
     duration_ms = item["track"]["duration_ms"]
     music_id = item["track"]["id"]
 
-    # Atualiza as informações da música
+    # Atualiza as informações da música, em nosso dicionario track_info
     track_info[track_name]["artist"] = artist_name
+    #Para cada musica que se repete o "repeteat_time" conta mais 1.
     track_info[track_name]["repeat_time"] += 1
-    track_info[track_name]["music_id"] = music_id
+    track_info[track_name]["music_id"] = "spotify:track:#{music_id}"
 
     # Calcula o tempo total escutado
     total_minutes = milliseconds_to_minutes(duration_ms) * track_info[track_name]["repeat_time"]
+    #Como a API entrega cada musica em milesegundos tive que criar uma funcao para transformar em muinuto, e depois mutiplicar com as vezes repetidas para ter o valor de tempo total.
     track_info[track_name]["total_time"] = total_minutes
-  end
-=begin
-  Cria o resultado final
-  result = track_info.map do |name, info|
-    #"Musica: #{name}, Artista: #{info['artist']}, Tempo escutado: #{info['total_time']} minutos, Vezes escutado: #{info['repeat_time']}\n"
-=end
-  
+    #aqui atualizamos o tatal do tempo escutado de cada musica apos mutiplicar com as vezes repetidas e ser transformado em minutos.
+  end  
+  #Transforma todos os dados coletados e armazenados em track_info acessiveis. 
   track_info.map do |name, info|
+    #.map -> Mapeia cada musica sendo KEY = name, VALUE = info
     {
       name: name,
       artist: info["artist"],
@@ -281,13 +290,16 @@ def time_to_listen(access_token)
 end
 
 def hash_most_listened(access_token)
+  #So retorna o dicionario da funcao anterioe para o programador ter uma nocao de como ficou o Hash inteiro.
   return time_to_listen(access_token)
 end
 
+#Ordena as musicas em ordem decrecente
 def sort_musics_most_listened(access_token)
+  #Coleta a funcao todas as musicas em uma variavel
   musics = time_to_listen(access_token)
 
-  # Ordena as músicas pelo número de vezes que foram escutadas (repeat_time) em ordem decrescente
+  # Ordena as músicas pelo número de vezes que foram escutadas (repeat_time) em ordem decrescente com o parametero -> -music[:repeat_time]
   sorted_musics = musics.sort_by { |music| -music[:repeat_time] }
 
   # Formata o resultado final para exibição
@@ -295,6 +307,72 @@ def sort_musics_most_listened(access_token)
     "Musica: #{music[:name]}, Artista: #{music[:artist]}, Tempo escutado: #{music[:total_time]} minutos, Vezes escutado: #{music[:repeat_time]}\n"
   end.join("\n")
 end
+
+def most_listened_ids(access_token)
+  musics = time_to_listen(access_token)
+
+  # Ordena as músicas pelo número de vezes que foram escutadas (repeat_time) em ordem decrescente
+  sorted_musics = musics.sort_by { |music| -music[:repeat_time] }
+
+  # Retorna uma lista de IDs das músicas mais escutadas
+  sorted_musics.map { |music| music[:music_id] }
+end
+
+def create_playlist_default(access_token, playlist_name="default", playlist_description="default", public = false)
+  user_id = get_profile_id(access_token)
+  url = "https://api.spotify.com/v1/users/#{user_id}/playlists"
+  
+  data = {
+    name: playlist_name,
+    description: playlist_description,
+    public: public
+    }.to_json
+
+  response = RestClient.post(url, data, {Authorization: "Bearer #{access_token}", content_type: :json, accept: :json})
+  new_playlist = JSON.parse(response.body)
+
+  return new_playlist
+end
+
+def create_playlist(access_token)
+  playlist_name = input("Qual o nome da sua playlist?")
+  description = input("Qual a descrição da sua playlist?")
+
+  default_playlist = create_playlist_default(access_token, playlist_name, description)
+  return default_playlist
+end
+
+def add_music(access_token, playlist_id, track_uris)
+  url = "https://api.spotify.com/v1/playlists/#{playlist_id}/tracks"
+
+  data = {
+    uris: track_uris
+  }.to_json
+
+  response = RestClient.post(url, data, {Authorization: "Bearer #{access_token}", content_type: :json, accept: :json})
+
+  return response
+end
+
+def create_most_listened_playlist(access_token)
+  # Passo 1: Criar a playlist "Mais Escutadas"
+  playlist_name = "Mais Escutadas"
+  playlist_description = "Playlist com as músicas mais escutadas recentemente."
+  new_playlist = create_playlist_default(access_token, playlist_name, playlist_description)
+  
+  # Obter o ID da nova playlist criada
+  playlist_id = new_playlist["id"]
+
+  # Passo 2: Coletar os IDs das músicas mais escutadas
+  most_listened_ids = most_listened_ids(access_token)
+
+  # Passo 3: Adicionar as músicas à playlist
+  add_music(access_token, playlist_id, most_listened_ids)
+  
+  puts "Playlist 'Mais Escutadas' criada com sucesso!"
+end
+
+
 
 access_token = ENV['ACCESS_TOKEN']
 
@@ -316,12 +394,8 @@ access_token = ENV['ACCESS_TOKEN']
 #puts all_tracks(access_token)
 #puts search_track(access_token, "One Of Us")
 #puts time_to_listen(access_token)
-puts hash_most_listened(access_token)
-puts sort_musics_most_listened(access_token)
-
-=begin
-url = "https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=5"
-response = RestClient.get(url, { Authorization: "Bearer #{access_token}"})
-url = JSON.parse(response.body)
-puts JSON.pretty_generate(url)
-=end
+#puts hash_most_listened(access_token)
+#puts sort_musics_most_listened(access_token)
+#puts create_playlist_default(access_token)
+#puts create_playlist(access_token)
+puts create_most_listened_playlist(access_token)
