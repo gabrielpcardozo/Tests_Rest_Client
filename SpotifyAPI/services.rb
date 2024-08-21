@@ -114,28 +114,17 @@ def list_playlist(access_token)
   end
 end
 
-#Verifica se o nome passado pelo usuario e valido, e coleta o id da playlist
-def get_name_for_id(access_token, input_playlist = "")
-  input "Qual Playlist você deseja?"
-  input_playlist = gets.chomp.downcase
+def get_playlist_id(access_token, playlist_name)
+  all_playlists = list_playlist(access_token)
 
-  url = "https://api.spotify.com/v1/users/#{get_profile_id(access_token)}/playlists"
-  response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
-  playlists = JSON.parse(response.body)
-  
-  if input_playlist.nill?
-    playlists["items"].each do |item|
-      playlist_name = item['name']
-      if input_playlist == playlist_name.downcase
-        playlist_id = item["id"]
-        return playlist_id
-      end
-    end
+  playlist = all_playlists.find { |pl| pl[:name].downcase == playlist_name.downcase }
+
+  if playlist
+    return playlist[:id]
+  else
+    puts "Playlist '#{playlist_name}' não encontrada."
+    return nil
   end
-  
-  puts "Playlist não encontrada, confira as suas playlists:"
-  list = list_playlist(access_token)
-  return list
 end
 
 #Coleta somente as musicas das playlists pelo ID.
@@ -378,16 +367,16 @@ def create_most_listened_playlist(access_token)
   # Obter o ID da nova playlist criada
   playlist_id = new_playlist["id"]
 
-  # Passo 2: Coletar os IDs das músicas mais escutadas
+  #Coletar os IDs das músicas mais escutadas
   most_listened_ids = most_listened_ids(access_token)
 
-  # Passo 3: Adicionar as músicas à playlist
+  #Adicionar as músicas à playlist
   add_music(access_token, playlist_id, most_listened_ids)
   
   puts "Playlist 'Mais Escutadas' criada com sucesso!"
 end
 
-def update_playlist(access_token, playlist_id, range_start = 0 , insert_before = 0, range_length = 0)
+def sort_playlist(access_token, playlist_id, range_start = 0 , insert_before = 0, range_length = 0)
 =begin
 DOC
 curl --request PUT \
@@ -413,24 +402,26 @@ curl --request PUT \
   return response
 end
 
-def get_playlist_by_name(playlists, target_name)
-  playlists.find { |playlist| playlist[:name] == target_name }
+def update_playlist(access_token, playlist_id, new_ids)
+  url = "https://api.spotify.com/v1/playlists/#{playlist_id}/tracks"
+
+  data = {
+    uris: new_ids
+  }.to_json
+
+  response = RestClient.put(url, data, {Authorization: "Bearer #{access_token}", content_type: :json, accept: :json})
+
+  return response
 end
 
 def refresh_playlist_most_listened(access_token)
   playlist_name = "Mais Escutadas"
-  all_playlists = list_playlist(access_token)
+  
+  playlist_id = get_playlist_id(access_token, playlist_name)
 
-  # Encontra a playlist "Mais Escutadas"
-  target_playlist = get_playlist_by_name(all_playlists, playlist_name)
+  new_musics = most_listened_ids(access_token)
 
-  if target_playlist
-    puts "Playlist '#{playlist_name}' encontrada. ID: #{target_playlist[:id]}"
-    # Aqui você pode adicionar o código para atualizar a playlist usando o ID encontrado.
-  else
-    puts "Playlist '#{playlist_name}' não encontrada. Criando uma nova..."
-    create_most_listened_playlist(access_token)
-  end
+  update_playlist(access_token, playlist_id, new_musics)
 end
 
 access_token = ENV['ACCESS_TOKEN']
@@ -443,7 +434,7 @@ access_token = ENV['ACCESS_TOKEN']
 
 #get_album_tracks(access_token)
 #puts list_playlist(access_token)
-puts get_name_for_id(access_token, "Mais Escutadas")
+#puts get_playlist_id(access_token, "Mais Escutadas")
 #test =  get_name_for_id(access_token)
 #puts test
 #puts get_playlist_tracks(access_token,test)
@@ -457,4 +448,4 @@ puts get_name_for_id(access_token, "Mais Escutadas")
 #puts create_playlist_default(access_token)
 #puts create_playlist(access_token)
 #puts create_most_listened_playlist(access_token)
-#puts refresh_playlist_most_listened(access_token)
+puts refresh_playlist_most_listened(access_token)
