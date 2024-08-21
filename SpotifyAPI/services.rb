@@ -83,43 +83,56 @@ def album_info(access_token)
   end
 
   return result
+
 end
 
 #Lista todas as playlists na conta para o usuario saber oq ele esta procurando. 
+
 def list_playlist(access_token)
-  #id = get_profile_id(access_token)
-  url = "https://api.spotify.com/v1/users/#{get_profile_id(access_token)}/playlists"
+  profile_id = get_profile_id(access_token)
+  url = "https://api.spotify.com/v1/users/#{profile_id}/playlists"
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
-  playlists_name = JSON.parse(response.body)
+  playlists_names = JSON.parse(response.body)
 
-  result = []
+  playlists_ids = Hash.new { |hash, key| hash[key] = { "playlist_name" => "", "playlist_id" => "" } }
 
-  playlists_name["items"].each do |item|
+  playlists_names["items"].each do |item|
     playlist_name = item['name']
+    playlist_id = item['id']
 
-    result << playlist_name
+    playlists_ids[playlist_name]["playlist_name"] = playlist_name
+    playlists_ids[playlist_name]["playlist_id"] = playlist_id
   end
 
-  return result
+  playlists_ids.map do |name, info|
+    
+    {
+      name: info["playlist_name"],
+      id: info["playlist_id"]
+    }
 
+  end
 end
 
 #Verifica se o nome passado pelo usuario e valido, e coleta o id da playlist
-def get_name_for_id(access_token)
-  puts "Qual Playlist você deseja?"
+def get_name_for_id(access_token, input_playlist = "")
+  input "Qual Playlist você deseja?"
   input_playlist = gets.chomp.downcase
 
   url = "https://api.spotify.com/v1/users/#{get_profile_id(access_token)}/playlists"
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
   playlists = JSON.parse(response.body)
   
-  playlists["items"].each do |item|
-    playlist_name = item['name']
-    if input_playlist == playlist_name.downcase
-      playlist_id = item["id"]
-      return playlist_id
+  if input_playlist.nill?
+    playlists["items"].each do |item|
+      playlist_name = item['name']
+      if input_playlist == playlist_name.downcase
+        playlist_id = item["id"]
+        return playlist_id
+      end
     end
   end
+  
   puts "Playlist não encontrada, confira as suas playlists:"
   list = list_playlist(access_token)
   return list
@@ -243,9 +256,11 @@ def time_to_listen(access_token)
   #URL com as informacoes necessarias
   url = "https://api.spotify.com/v1/me/player/recently-played"
   #Adiciona um parametro de 50 items(musicas)
-  params = { limit: 50 }
+  #params = { limit: 50 }
   #Usa o restclient para coletar as informacoes
-  response = RestClient.get(url, { Authorization: "Bearer #{access_token}", params: params })
+  response = RestClient.get("#{url}?limit=50", { Authorization: "Bearer #{access_token}" })
+  #response = RestClient.get(url, { Authorization: "Bearer #{access_token}", params: params })
+
   # Devolve em formato Json.
   recently_listened = JSON.parse(response.body)
   #Crio uma hash(dicionario) para ter um padrao do que eu quero de informacoes coletadas.
@@ -355,7 +370,7 @@ def add_music(access_token, playlist_id, track_uris)
 end
 
 def create_most_listened_playlist(access_token)
-  # Passo 1: Criar a playlist "Mais Escutadas"
+  #Criar a playlist "Mais Escutadas"
   playlist_name = "Mais Escutadas"
   playlist_description = "Playlist com as músicas mais escutadas recentemente."
   new_playlist = create_playlist_default(access_token, playlist_name, playlist_description)
@@ -372,7 +387,51 @@ def create_most_listened_playlist(access_token)
   puts "Playlist 'Mais Escutadas' criada com sucesso!"
 end
 
+def update_playlist(access_token, playlist_id, range_start = 0 , insert_before = 0, range_length = 0)
+=begin
+DOC
+curl --request PUT \
+--url https://api.spotify.com/v1/playlists/3cEYpjA9oz9GiPac4AsH4n/tracks \
+--header 'Authorization: Bearer 1POdFZRZbvb...qqillRxMr2z' \
+--header 'Content-Type: application/json' \
+--data '{
+  "range_start": 1,
+  "insert_before": 3,
+  "range_length": 2
+}' 
+=end
 
+   data = {
+    range_start: range_start,
+    insert_before: insert_before,
+    range_length: range_length
+   }
+
+  url = "https://api.spotify.com/v1/playlists/#{playlist_id}/tracks"
+  response = RestClient.put(url, data, {Authorization: "Bearer #{access_token}}",content_type: :json, accept: :json})
+
+  return response
+end
+
+def get_playlist_by_name(playlists, target_name)
+  playlists.find { |playlist| playlist[:name] == target_name }
+end
+
+def refresh_playlist_most_listened(access_token)
+  playlist_name = "Mais Escutadas"
+  all_playlists = list_playlist(access_token)
+
+  # Encontra a playlist "Mais Escutadas"
+  target_playlist = get_playlist_by_name(all_playlists, playlist_name)
+
+  if target_playlist
+    puts "Playlist '#{playlist_name}' encontrada. ID: #{target_playlist[:id]}"
+    # Aqui você pode adicionar o código para atualizar a playlist usando o ID encontrado.
+  else
+    puts "Playlist '#{playlist_name}' não encontrada. Criando uma nova..."
+    create_most_listened_playlist(access_token)
+  end
+end
 
 access_token = ENV['ACCESS_TOKEN']
 
@@ -383,9 +442,8 @@ access_token = ENV['ACCESS_TOKEN']
 #puts album_info(access_token)
 
 #get_album_tracks(access_token)
-#puts get_playlists(access_token)
 #puts list_playlist(access_token)
-#puts get_name_for_id(access_token)
+puts get_name_for_id(access_token, "Mais Escutadas")
 #test =  get_name_for_id(access_token)
 #puts test
 #puts get_playlist_tracks(access_token,test)
@@ -398,4 +456,5 @@ access_token = ENV['ACCESS_TOKEN']
 #puts sort_musics_most_listened(access_token)
 #puts create_playlist_default(access_token)
 #puts create_playlist(access_token)
-puts create_most_listened_playlist(access_token)
+#puts create_most_listened_playlist(access_token)
+#puts refresh_playlist_most_listened(access_token)
