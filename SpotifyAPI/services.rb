@@ -424,6 +424,37 @@ def refresh_playlist_most_listened(access_token)
   update_playlist(access_token, playlist_id, new_musics)
 end
 
+def delete_playlist(access_token, playlist_name)
+  playlist_id = get_playlist_id(access_token, playlist_name)
+  url = "https://api.spotify.com/v1/playlists/#{playlist_id}/followers"
+  
+  response = RestClient.delete(
+    url,
+    Authorization: "Bearer #{access_token}"
+  )
+  
+  return response
+  #Essa funcao ela tem uma explicacao, pois ela nao exclui de fato a playlist encontrada ela so deixa de seguir.
+  #Para o spotify vc deixar de seguir uma playlist e o mesmo cenario, porem caso algum outro usuario esteja seguindo essa playlist ela ainda vai existir.
+end
+
+def delete_playlists_tracks(access_token, playlist_name, tracks)
+  playlist_id = get_playlist_id(access_token, playlist_name)
+  url = "https://api.spotify.com/v1/playlists/#{playlist_id}/tracks"
+  
+  data = {
+    uri: tracks
+}.to_json
+
+  response = RestClient.delete(
+    url, data,
+    {Authorization: "Bearer #{access_token}", content_type: :json, accept: :json}
+  )
+  
+  return response
+  
+end
+
 access_token = ENV['ACCESS_TOKEN']
 
 #puts get_profile(access_token)
@@ -448,4 +479,5 @@ access_token = ENV['ACCESS_TOKEN']
 #puts create_playlist_default(access_token)
 #puts create_playlist(access_token)
 #puts create_most_listened_playlist(access_token)
-puts refresh_playlist_most_listened(access_token)
+#puts refresh_playlist_most_listened(access_token)
+puts delete_playlist(access_token, "default")
