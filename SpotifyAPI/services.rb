@@ -1,10 +1,11 @@
 require 'rest-client'
 require 'json'
+require 'pp'
 #Metodo de autenticação temporário, enquanto não arrumo o arquivo de autenticação.
 require 'dotenv'
 Dotenv.load('teste.env')
 
-#Coleta todo o retorno do profile do usuario permitido. 
+#Coleta todas as informações do usuário autorizado.
 def get_profile(access_token)
   url = "https://api.spotify.com/v1/me"
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
@@ -14,60 +15,94 @@ end
 #Profile "formatado" Nome Completo e Usuario
 def format_profile(access_token)
   profile = get_profile(access_token)
-
+#So fiz isso para "brincar" com as requisicoes.
   profile_name = profile["display_name"]
   id = profile["id"]
   #uri = profile["uri"].split(':').last
   return "Full Name: #{profile_name}, User: #{id}" 
 end
-
+#Muito necessario para diversas outras funcoes no programa.
 def get_profile_id(access_token)
   profile = get_profile(access_token)
+  #Coleta somente o ID para utilizacoes de acesso as informacoes do usuario em funcoes mais a frente.
   id = profile["id"]
   return id
 end
 
-#Coleta todas as músicas.
+#Coleta todas as músicas salvas disponiveis na conta autorizada.
 def all_tracks(access_token)
   url = "https://api.spotify.com/v1/me/tracks"
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
   tracks = JSON.parse(response.body)
+  #Para cada ITEM dentro de ITEMS estou coltando o album e a musica, do item salvo.
+  
+  #Criacao das hash para conseguir coletar os dados de forma separada caso necessario
+  result = Hash.new {|hash, key| hash[key] = {"Track_Name" => "", "Track_ID" => ""}}
   
   tracks['items'].each do |item|
-    track = item['album']
-    return track['name']
+    track = item['track']['name']
+    track_id = item['track']['id']  
+  
+    result[track]["Track_Name"] = track 
+    result[track]["Track_ID"] = track_id
   end
+  return result
 end
 
-#Coleta somente o nome de todos os albums salvos na conta.
+#Coleta os albums da conta autorizada.
 def get_albums(access_token)
   url = "https://api.spotify.com/v1/me/albums"
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
   albums = JSON.parse(response.body)
   
+  result = Hash.new { |hash, key| hash[key] = [] }
+  #result = Hash.new {|hash, key| hash[key] = {"Album_Name" => "", "Album_id" => ""}}
+  #Coletando os nomes de cada album, para utilizar se necessario. 
   albums['items'].each do |item|
     album = item['album']
-    return album['name']
+    album_type = item["album_type"]
+    album_name = album['name']
+    album_id = album["id"]
+
+    #result[album_type] = album_type
+    #result[album_name]["Album_Name"] = album_name
+    #result[album_name]["Album_id"] = album_id
+
+    #Como a hash foi criada como lista =[] estou passando todas as informacoes de uma so vez.
+    result[album_type] << { "Album_Name" => album_name, "Album_id" => album_id }
+
   end
+  return result
 end
 
-#Coleta um album com o seu ID de parâmetro.
+#Coleta as musicas de um album solcitado.
+#id pode ser coletado das outras funcoes.
 def get_album_tracks(access_token, id)
   url = "https://api.spotify.com/v1/albums/#{id}/tracks"
   response =  RestClient.get(url, { Authorization: "Bearer #{access_token}" })
   album =  JSON.parse(response.body)["items"]
-  return album
+  
+  result = []
+
+  album.each do |item|
+    track_name = item["name"]
+    track_id = item["id"]
+
+    result << { "Name" => track_name, "ID" => track_id }
+  end
+  
+  return result
 end
 
 #Todos os albums no profile do usuario autorizado com o artista do album, quantidade de musicas e as musicas.
-def album_info(access_token)
+def format_album(access_token)
   url = "https://api.spotify.com/v1/me/albums"
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
   albums = JSON.parse(response.body)
 
   result = []
+  #result = Hash.new {}
   
-
   albums['items'].each do |item|
     album = item['album']
     album_name = album['name']
@@ -76,34 +111,32 @@ def album_info(access_token)
     album_id = album['id']
     
     # Obter as músicas do álbum
+    # Usa a funcao anterioro pass o ID do album coletado agora e coleta todas as musicas.
     tracks = get_album_tracks(access_token, album_id)
-    track_names = tracks.map { |track| track['name'] }.join(', ')
+    track_names = tracks.map { |track| track["Name"]}.join(', ')
     
     result << "Álbum: #{album_name}, Artista(s): #{artist_names}, Total tracks: #{quantity_tracks}, Tracks: #{track_names}"     
   end
-
   return result
-
 end
 
-#Lista todas as playlists na conta para o usuario saber oq ele esta procurando. 
-
+#Lista todas as playlists na conta para o usuario. 
 def list_playlist(access_token)
   profile_id = get_profile_id(access_token)
   url = "https://api.spotify.com/v1/users/#{profile_id}/playlists"
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
   playlists_names = JSON.parse(response.body)
-
+#Cria a Hash para a utilizacao do projeto.
   playlists_ids = Hash.new { |hash, key| hash[key] = { "playlist_name" => "", "playlist_id" => "" } }
-
+#COleta os dados da API
   playlists_names["items"].each do |item|
     playlist_name = item['name']
     playlist_id = item['id']
-
+#Adiciona os dados na Hash criada
     playlists_ids[playlist_name]["playlist_name"] = playlist_name
     playlists_ids[playlist_name]["playlist_id"] = playlist_id
   end
-
+#Mapeia todas as informacoes coletadas e deixa disponivel para as proximas funcoes
   playlists_ids.map do |name, info|
     
     {
@@ -113,12 +146,13 @@ def list_playlist(access_token)
 
   end
 end
-
+#Coleta as infformacao de uma playlist unica, usando o id da playlist anterior.
 def get_playlist_id(access_token, playlist_name)
+ #Chama a funcao que lista todas as playlists da conta
   all_playlists = list_playlist(access_token)
-
+#Localiza a playlist pelo nome passado no parametro da funcao get_playlist_id
   playlist = all_playlists.find { |pl| pl[:name].downcase == playlist_name.downcase }
-
+#Se a playlist foi econtrada, coleta o ID, caso contrariop mensagem de NOT FOUND.
   if playlist
     return playlist[:id]
   else
@@ -128,15 +162,19 @@ def get_playlist_id(access_token, playlist_name)
 end
 
 #Coleta somente as musicas das playlists pelo ID.
+#A Playlist anterior coleta o ID logo conseguimos usa-la aqui, para coletar as musicas de uma playlist.
 def get_playlist_tracks(access_token, playlist_id)
   url = "https://api.spotify.com/v1/playlists/#{playlist_id}/tracks"
   response = RestClient.get(url, { Authorization: "Bearer #{access_token}" })
   tracks = JSON.parse(response.body)
+  #Mapeia todas as musicas na variavel RESPONSE.
   track_names = tracks['items'].map { |item| item['track']['name'] }
+  #Separa as musicas com , 
   track_names.join(', ')
 end
 
 #Coleta todas as playlists e suas musicas uma ao lado da outra.
+#Semelhante a funcao format_album porem agora das playlists da conta autorizada.
 def get_all_playlists(access_token)
   profile = get_profile(access_token)
   id = profile["id"]
@@ -167,13 +205,17 @@ end
 
 #Musicas mais escutadas da conta autenticada
 def most_musics_listen(access_token)
+  #Nessa URL temos dois parametros opcionais e alteraveis. 
   url = "https://api.spotify.com/v1/me/top/tracks?time_range=short_term&limit=5"
+    #time_range -> E o tempo da consulto, SHORT quer dizer que ele filtra as musicas mais escutadas de semanas atras.
+    #limit -> So coleta as ultimas 5 musicas mais escutadas disponiveis.
   response = RestClient.get(url, {Authorization: "Bearer #{access_token}"})
   most_listen = JSON.parse(response.body)
   
   result = []
 
   most_listen['items'].each do |item|
+    #Mapeando todas as musicas que estao na variavel RESPONSE
     artists = item['artists'].map { |artist| artist['name'] }.join(", ")
     track = item['name']
 
@@ -181,30 +223,33 @@ def most_musics_listen(access_token)
   end
 
   return result
+
 end
 
 
 #Cria um resumo da conta autenticada, como albums, musicas mais escutadas, principais playlists e principais podcasts
 def resume_profile(access_token)
   result = []
-  #Profile
+  #Profile resume
   my_profile = get_profile(access_token)
   name = my_profile["display_name"]
   user = my_profile["id"]
   result << name
   result << user
   result << "------"
-  #Best Musics
+  #Best Musics -  Resume das musicas mais escutadas
   best_musics = most_musics_listen(access_token)
   result << best_musics
   result << "------"
-  #My playlists
+  #My playlists - coleta todas as playlists da minha conta. 
   my_playlists = list_playlist(access_token)
   result << my_playlists
 
   return result
 end
 
+#E uma funcao de busca por nome
+#a funcao devolve ate 10 musicas com o nome aproximadamente.
 def search_track(access_token, input_search, type="default", limit=10)
   url = 'https://api.spotify.com/v1/search'
   params = {
@@ -220,12 +265,13 @@ def search_track(access_token, input_search, type="default", limit=10)
 
   result = []
 
+  #Apos coletar os possiveis resultados e necessario formatar os resultados para 
   search["tracks"]["items"].each do |item|
     track_name = item["name"]
     artist_name = item["artists"].map { |artist| artist["name"] }.join(", ")
     artist_profile = item["artists"].first["external_urls"]["spotify"]
     track_album = item["album"]["external_urls"]["spotify"]
-
+#Adiciona as informacoes na lista criada. 
     infos = "Music Name: #{track_name}, Artist Name: #{artist_name}, Artist Profile: #{artist_profile}, Album: #{track_album}"
     result << "-" * infos.length
     result << infos
@@ -234,21 +280,21 @@ def search_track(access_token, input_search, type="default", limit=10)
   return result
   
 end
-
+#Aqui e um helper para as proximas funcoes que eu vou precisar mais para a funcao a seguir time_to_listen.
 def milliseconds_to_minutes(milliseconds)
   seconds = milliseconds / 1000.0
   minutes = seconds / 60.0
   minutes.round(2)
 end
 
+#E uma funcao onde coletamos as musicas mais escutadas e o tempo em cada musica.
 def time_to_listen(access_token)
   #URL com as informacoes necessarias
+  #Essa url coleta as ultimas musicas escutadas.
   url = "https://api.spotify.com/v1/me/player/recently-played"
-  #Adiciona um parametro de 50 items(musicas)
-  #params = { limit: 50 }
-  #Usa o restclient para coletar as informacoes
+
+  #Usa o restclient para coletar as informacoes das 50 ultimas musicas
   response = RestClient.get("#{url}?limit=50", { Authorization: "Bearer #{access_token}" })
-  #response = RestClient.get(url, { Authorization: "Bearer #{access_token}", params: params })
 
   # Devolve em formato Json.
   recently_listened = JSON.parse(response.body)
@@ -322,42 +368,45 @@ def most_listened_ids(access_token)
   sorted_musics.map { |music| music[:music_id] }
 end
 
+#E uma funcao de criacao de playlist, todos os parametros sao DEFAULT, caso o usuario esqueca de preencher alguma informacao. 
 def create_playlist_default(access_token, playlist_name="default", playlist_description="default", public = false)
+  #coleta o id para usar o ID dessa conta.
   user_id = get_profile_id(access_token)
   url = "https://api.spotify.com/v1/users/#{user_id}/playlists"
-  
+  #as informacoes que vao ser utilizadas para criar a playlist.
   data = {
     name: playlist_name,
     description: playlist_description,
     public: public
     }.to_json
-
+#Usa o metodo post para criar a playlist.
   response = RestClient.post(url, data, {Authorization: "Bearer #{access_token}", content_type: :json, accept: :json})
   new_playlist = JSON.parse(response.body)
-
+#Retorna a playlist, mas nao seria necessario.
   return new_playlist
 end
-
+#e uma funcao input que da a opcao do usuario criar uma playlist com o NOME e DESCRICAO descrito.
 def create_playlist(access_token)
   playlist_name = input("Qual o nome da sua playlist?")
   description = input("Qual a descrição da sua playlist?")
-
+#Usando a playlist anterior para economizar codigo.
   default_playlist = create_playlist_default(access_token, playlist_name, description)
   return default_playlist
 end
-
+#As playlists anteriores so criam a playlist vazia, aqui vamos adicionar "ITEMS" musicas dentro da playlist
 def add_music(access_token, playlist_id, track_uris)
+  #URL da playlist que vai receber as musicas.
   url = "https://api.spotify.com/v1/playlists/#{playlist_id}/tracks"
-
+#Precisamos da URI da musica para musica ser adicionada em uma playlist
   data = {
     uris: track_uris
   }.to_json
-
+#Usa o metodo post para pegar a playlist(URL), as musicas(DATA) e conseguimos colocar as musicas na playlist.
   response = RestClient.post(url, data, {Authorization: "Bearer #{access_token}", content_type: :json, accept: :json})
 
   return response
 end
-
+#Foi uma ideia de criar uma playlist com as musicas mais escutadas na ordem correta.
 def create_most_listened_playlist(access_token)
   #Criar a playlist "Mais Escutadas"
   playlist_name = "Mais Escutadas"
@@ -375,7 +424,7 @@ def create_most_listened_playlist(access_token)
   
   puts "Playlist 'Mais Escutadas' criada com sucesso!"
 end
-
+#Meio confuso, mas da a opcao de reordenar a playlist.
 def sort_playlist(access_token, playlist_id, range_start = 0 , insert_before = 0, range_length = 0)
 =begin
 DOC
@@ -401,7 +450,7 @@ curl --request PUT \
 
   return response
 end
-
+#Atualiza uma playlist que ja existe e ja possue musicas armazenadas dentro dela. 
 def update_playlist(access_token, playlist_id, new_ids)
   url = "https://api.spotify.com/v1/playlists/#{playlist_id}/tracks"
 
@@ -413,17 +462,19 @@ def update_playlist(access_token, playlist_id, new_ids)
 
   return response
 end
-
+#Atualiza a playlist criada com as musicas mais escutadas.
 def refresh_playlist_most_listened(access_token)
+  #Playlist procurada
   playlist_name = "Mais Escutadas"
-  
+  #coleta o id da playlist
   playlist_id = get_playlist_id(access_token, playlist_name)
-
+#Coleta as novas musicas 
   new_musics = most_listened_ids(access_token)
-
+#Atualiza a playlist com as musicas passadas.
   update_playlist(access_token, playlist_id, new_musics)
 end
 
+#Deleta uma playlist pelo nome
 def delete_playlist(access_token, playlist_name)
   playlist_id = get_playlist_id(access_token, playlist_name)
   url = "https://api.spotify.com/v1/playlists/#{playlist_id}/followers"
@@ -438,6 +489,7 @@ def delete_playlist(access_token, playlist_name)
   #Para o spotify vc deixar de seguir uma playlist e o mesmo cenario, porem caso algum outro usuario esteja seguindo essa playlist ela ainda vai existir.
 end
 
+#Remove da playlist passada a musica especificada. 
 def delete_playlists_tracks(access_token, playlist_name, tracks)
   playlist_id = get_playlist_id(access_token, playlist_name)
   url = "https://api.spotify.com/v1/playlists/#{playlist_id}/tracks"
@@ -455,29 +507,18 @@ def delete_playlists_tracks(access_token, playlist_name, tracks)
   
 end
 
-access_token = ENV['ACCESS_TOKEN']
+#access_token = ENV['ACCESS_TOKEN']
 
 #puts get_profile(access_token)
 #puts format_profile(access_token)
 #puts get_profile_id(access_token)
-#get_albums(access_token)
-#puts album_info(access_token)
-
-#get_album_tracks(access_token)
+#pp all_tracks(access_token)
+#pp get_albums(access_token)
+#puts get_album_tracks(access_token, "7EPrkhjTBrwAV8yAKCmY0Y")
+#puts format_album(access_token)
 #puts list_playlist(access_token)
-#puts get_playlist_id(access_token, "Mais Escutadas")
-#test =  get_name_for_id(access_token)
-#puts test
-#puts get_playlist_tracks(access_token,test)
+#puts get_playlist_id(access_token,"My Connection")
+#puts get_playlist_tracks(access_token,"1Cg9fb6El6ba5FbnjeW6CQ")
+#puts get_all_playlists(access_token)
 #puts most_musics_listen(access_token)
-#puts resume_profile(access_token)
-#puts all_tracks(access_token)
-#puts search_track(access_token, "One Of Us")
-#puts time_to_listen(access_token)
-#puts hash_most_listened(access_token)
-#puts sort_musics_most_listened(access_token)
-#puts create_playlist_default(access_token)
-#puts create_playlist(access_token)
-#puts create_most_listened_playlist(access_token)
-#puts refresh_playlist_most_listened(access_token)
-puts delete_playlist(access_token, "default")
+#uts resume_profile(access_token)
