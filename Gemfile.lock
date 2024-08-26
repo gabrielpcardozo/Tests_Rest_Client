@@ -1,6 +1,7 @@
 GEM
   specs:
     domain_name (0.6.20240107)
+    dotenv (3.1.2)
     http-accept (1.7.0)
     http-cookie (1.0.6)
       domain_name (~> 0.5)
@@ -31,6 +32,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  dotenv
   rest-client (~> 2.1)
   sinatra (~> 3.1.0)
 
